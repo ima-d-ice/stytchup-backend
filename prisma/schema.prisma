@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                   String         @id @default(cuid())
+  name                 String?
+  email                String         @unique
+  password             String
+  role                 Role           @default(CUSTOMER)
+  razorpayCustomerId   String?        @unique
+  razorpayAccountId    String?        @unique
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  addresses            Address[]
+  conversationsAsUser1 Conversation[] @relation("User1Convos")
+  conversationsAsUser2 Conversation[] @relation("User2Convos")
+  designs              Design[]
+  messagesSent         Message[]
+  ordersBought         Order[]        @relation("BuyerOrders")
+  ordersSold           Order[]        @relation("SellerOrders")
+  reviews              Review[]
+  profile              UserProfile?
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  bio         String?
+  avatarUrl   String?
+  website     String?
+  location    String?
+  socialLinks Json?
+  skills      String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  label     String?
+  street    String
+  city      String
+  state     String
+  zip       String
+  country   String
+  isDefault Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Design {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  price       Int
+  imageUrl    String
+  gallery     String[]
+  category    String?
+  type        DesignType @default(CATALOG)
+  material    String?
+  sizeGuide   String?
+  isPinned    Boolean    @default(false)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  designerId  String
+  designer    User       @relation(fields: [designerId], references: [id])
+  orders      Order[]
+  reviews     Review[]
+}
+
+model Order {
+  id                      String      @id @default(cuid())
+  status                  OrderStatus @default(PENDING)
+  totalAmount             Int
+  requirements            String?
+  razorpayOrderId         String?     @unique
+  razorpayPaymentId       String?     @unique
+  razorpaySignature       String?
+  shippingCarrier         String?
+  trackingNumber          String?
+  customerMeasurements    Json?
+  deliveredAt             DateTime?
+  completedAt             DateTime?
+  revisionCount           Int         @default(0)
+  isDesignerPaid          Boolean     @default(false)
+  createdAt               DateTime    @default(now())
+  updatedAt               DateTime    @updatedAt
+  buyerId                 String
+  designerId              String
+  designId                String?
+  designSnapshot          Json
+  shippingAddressSnapshot Json?
+  buyer                   User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  design                  Design?     @relation(fields: [designId], references: [id])
+  designer                User        @relation("SellerOrders", fields: [designerId], references: [id])
+  review                  Review?
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  userId    String
+  designId  String
+  orderId   String   @unique
+  design    Design   @relation(fields: [designId], references: [id])
+  order     Order    @relation(fields: [orderId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user1Id   String
+  user2Id   String
+  user1     User      @relation("User1Convos", fields: [user1Id], references: [id])
+  user2     User      @relation("User2Convos", fields: [user2Id], references: [id])
+  messages  Message[]
+
+  @@unique([user1Id, user2Id])
+}
+
+model Message {
+  id              String       @id @default(cuid())
+  createdAt       DateTime     @default(now())
+  conversationId  String
+  senderId        String
+  text            String?
+  attachmentUrl   String?
+  isOffer         Boolean      @default(false)
+  offerPrice      Int?
+  offerTitle      String?
+  offerStatus     OfferStatus?
+  isDelivery      Boolean      @default(false)
+  relatedDesignId String?
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User         @relation(fields: [senderId], references: [id])
+}
+
+enum Role {
+  CUSTOMER
+  DESIGNER
+  ADMIN
+}
+
+enum DesignType {
+  CATALOG
+  CUSTOM
+}
+
+enum OrderStatus {
+  PENDING
+  AWAITING_REQUIREMENTS
+  IN_PROGRESS
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
