@@ -16,6 +16,7 @@
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
     "@types/cookie-parser": "^1.4.10",
+    "@types/node": "^24.10.1",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.65.0",
     "cookie-parser": "^1.4.7",
@@ -27,9 +28,9 @@
     "next-auth": "^4.24.13",
     "prisma": "^7.0.0",
     "razorpay": "^2.9.6",
+    "socket.io": "^4.8.3",
     "stripe": "^20.0.0",
-    "typescript": "~5.7.0",
-    "@types/node": "^24.10.1"
+    "typescript": "~5.7.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

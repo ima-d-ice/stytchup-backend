@@ -65,9 +65,9 @@ async function decodeBase64AsWasm(wasmBase64) {
     return new WebAssembly.Module(wasmArray);
 }
 config.compilerWasm = {
-    getRuntime: async () => await Promise.resolve().then(() => __importStar(require("@prisma/client/runtime/query_compiler_bg.postgresql.mjs"))),
+    getRuntime: async () => await Promise.resolve().then(() => __importStar(require("@prisma/client/runtime/query_compiler_bg.postgresql.js"))),
     getQueryCompilerWasmModule: async () => {
-        const { wasm } = await Promise.resolve().then(() => __importStar(require("@prisma/client/runtime/query_compiler_bg.postgresql.wasm-base64.mjs")));
+        const { wasm } = await Promise.resolve().then(() => __importStar(require("@prisma/client/runtime/query_compiler_bg.postgresql.wasm-base64.js")));
         return await decodeBase64AsWasm(wasm);
     }
 };
