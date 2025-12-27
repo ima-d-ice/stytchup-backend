@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/src/index.js",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc"
+    "build": "npx prisma generate && tsc -p tsconfig.json"
   },
   "keywords": [],
   "author": "",
@@ -28,7 +28,7 @@
     "prisma": "^7.0.0",
     "razorpay": "^2.9.6",
     "stripe": "^20.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "~5.7.0",
     "@types/node": "^24.10.1"
   },
   "devDependencies": {
@@ -41,6 +41,6 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "~5.7.0"
   }
 }
