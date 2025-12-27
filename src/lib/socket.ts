@@ -1,5 +1,5 @@
 import { Server as HttpServer } from 'http';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 
 let io: Server;
 
@@ -12,7 +12,7 @@ export const initSocket = (httpServer: HttpServer) => {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', (socket: Socket) => {
     // console.log(`⚡ Client connected: ${socket.id}`);
 
     // Join a chat room
