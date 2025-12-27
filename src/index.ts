@@ -22,7 +22,7 @@ const port = process.env.PORT || 4000;
 // --- MIDDLEWARE ---
 app.use(cookieParser());
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'https://stytchup.vercel.app'],
   credentials: true 
 }));
 app.use(express.json());

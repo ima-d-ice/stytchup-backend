@@ -6,7 +6,7 @@ let io: Server;
 export const initSocket = (httpServer: HttpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: "http://localhost:3000", // Update this if your frontend port changes
+      origin: ["http://localhost:3000", "https://stytchup.vercel.app"], // Update this if your frontend port changes
       methods: ["GET", "POST"],
       credentials: true
     }
