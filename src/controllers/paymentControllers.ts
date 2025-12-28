@@ -5,19 +5,12 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { razorpay } from '../lib/razorpay'; 
 
 export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
-  const { amount, sourceId, type } = req.body; 
+  const { sourceId, type } = req.body; 
   const userId = req.user!;
 
   try {
-    const options = {
-      amount: amount, 
-      currency: "INR",
-      receipt: `receipt_${Date.now()}`,
-      notes: { userId, sourceId, type }
-    };
-
-    const rpOrder = await razorpay.orders.create(options);
-    let dbOrderId = "";
+    let priceToCharge = 0;
+    let orderData: any = {};
 
     // 1. CHAT OFFER
     if (type === 'CHAT_OFFER') {
@@ -30,14 +23,14 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
          return res.status(400).json({ error: "Invalid Offer" });
        }
 
-       const newOrder = await prisma.order.create({
-         data: {
+       priceToCharge = message.offerPrice!;
+       
+       orderData = {
            buyerId: userId,
            designerId: message.senderId, // 👈 Explicit Designer ID
            designId: null, // Custom orders have no design
            totalAmount: message.offerPrice!,
-           status: 'AWAITING_REQUIREMENTS', 
-           razorpayOrderId: rpOrder.id,
+           status: 'PENDING', 
            requirements: message.offerTitle, 
            designSnapshot: {
              title: message.offerTitle || "Custom Service",
@@ -45,15 +38,7 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
              image: "", 
              isCustom: true
            }
-         }
-       });
-
-       await prisma.message.update({
-         where: { id: sourceId },
-         data: { offerStatus: 'ACCEPTED' }
-       });
-
-       dbOrderId = newOrder.id;
+       };
     } 
     
     // 2. CATALOG ITEM
@@ -66,27 +51,50 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
             include: { addresses: { where: { isDefault: true } } }
         });
 
-        const newOrder = await prisma.order.create({
-            data: {
-                buyerId: userId,
-                designerId: design.designerId, // 👈 Explicit Designer ID
-                designId: design.id,
-                totalAmount: design.price, 
-                status: 'AWAITING_REQUIREMENTS', 
-                razorpayOrderId: rpOrder.id,
-                designSnapshot: { 
-                    title: design.title, 
-                    price: design.price, 
-                    image: design.imageUrl,
-                    material: design.material 
-                },
-                shippingAddressSnapshot: user?.addresses[0] || {} 
-            }
-        });
-        dbOrderId = newOrder.id;
+        priceToCharge = design.price;
+
+        orderData = {
+            buyerId: userId,
+            designerId: design.designerId, // 👈 Explicit Designer ID
+            designId: design.id,
+            totalAmount: design.price, 
+            status: 'PENDING', 
+            designSnapshot: { 
+                title: design.title, 
+                price: design.price, 
+                image: design.imageUrl,
+                material: design.material 
+            },
+            shippingAddressSnapshot: user?.addresses[0] || {} 
+        };
+    } else {
+        return res.status(400).json({ error: "Invalid Order Type" });
     }
 
-    res.json({ ...rpOrder, dbOrderId });
+    const options = {
+      amount: priceToCharge * 100, // Convert to paise
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+      notes: { userId, sourceId, type }
+    };
+
+    const rpOrder = await razorpay.orders.create(options);
+
+    const newOrder = await prisma.order.create({
+        data: {
+            ...orderData,
+            razorpayOrderId: rpOrder.id,
+        }
+    });
+
+    if (type === 'CHAT_OFFER') {
+       await prisma.message.update({
+         where: { id: sourceId },
+         data: { offerStatus: 'ACCEPTED' }
+       });
+    }
+
+    res.json({ ...rpOrder, dbOrderId: newOrder.id });
 
   } catch (error: any) {
     console.error("Razorpay Error:", error);
