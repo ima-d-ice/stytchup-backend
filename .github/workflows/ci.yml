@@ -1,0 +1,46 @@
+name: backend-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/db
+      - run: npm test
+      - name: Validate OpenAPI spec
+        run: node -e "const {spec}=require('./src/lib/swagger.js'); if(!spec.paths['/orders/ship']) throw new Error('missing paths'); console.log('paths:', Object.keys(spec.paths).length)"
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: stytchup-backend
+      - uses: actions/checkout@v4
+        with:
+          repository: ima-d-ice/stytchup
+          path: stytchup
+      - name: Validate compose config
+        working-directory: stytchup-backend
+        env:
+          JWT_SECRET: ci-dummy
+          NEXTAUTH_SECRET: ci-dummy
+        run: docker compose -f compose.yaml config --quiet
+      - name: Build backend image
+        working-directory: stytchup-backend
+        run: docker build -t stytchup-backend:ci .
+      - name: Build frontend image
+        run: docker build -t stytchup-frontend:ci -f stytchup/Dockerfile stytchup

@@ -1,7 +1,6 @@
 // src/prisma.js
-// Note: generated client is TypeScript (.ts) — Node 22+ strips types natively,
-// so require the explicit .ts path (extensionless resolve only tries .js/.json).
-const { PrismaClient } = require("./generated/prisma/client.ts");
+// Generated client is plain JS (generator "prisma-client-js"), so plain require works.
+const { PrismaClient } = require("./generated/prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const dotenv = require("dotenv");
 

@@ -11,6 +11,8 @@ const inboxRoutes = require('./routes/inboxRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const { initSocket } = require('./lib/socket');
 const { createServer } = require('http');
+const swaggerUi = require('swagger-ui-express');
+const { spec: openApiSpec } = require('./lib/swagger');
 
 dotenv.config();
 const app = express();
@@ -38,6 +40,20 @@ app.use('/inbox', inboxRoutes);
 app.use('/orders', orderRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [System]
+ *     summary: Liveness probe (also used by Docker HEALTHCHECK)
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: '{ ok: true }'
+ */
+app.get('/openapi.json', (req, res) => res.json(openApiSpec));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // --- START SERVER ---
 if (require.main === module) {

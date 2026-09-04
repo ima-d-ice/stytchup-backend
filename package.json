@@ -4,7 +4,8 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/*.test.js",
+    "test:ci": "node --test tests/*.test.js",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "build": "npx prisma generate"
@@ -30,7 +31,8 @@
     "prisma": "^7.0.0",
     "razorpay": "^2.9.6",
     "socket.io": "^4.8.3",
-    "stripe": "^20.0.0"
-  },
-  "devDependencies": {}
+    "stripe": "^20.0.0",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1"
+  }
 }

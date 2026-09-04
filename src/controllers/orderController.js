@@ -1,4 +1,5 @@
 const { prisma } = require('../../prisma');
+const { assertTransition } = require('../lib/orderTransitions');
 
 // 1. Submit Measurements (User Action)
 // Triggers transition: AWAITING_REQUIREMENTS -> IN_PROGRESS
@@ -12,9 +13,11 @@ const submitMeasurements = async (req, res) => {
     if (!order) return res.status(404).json({ error: "Order not found" });
     if (order.buyerId !== req.user) return res.status(403).json({ error: "Not authorized" });
 
-    // Only allow if in correct state
-    if (order.status !== 'AWAITING_REQUIREMENTS') {
-        return res.status(400).json({ error: "Order is not awaiting requirements" });
+    // Only allow if in correct state (AWAITING_REQUIREMENTS -> IN_PROGRESS)
+    try {
+      assertTransition(order.status, 'IN_PROGRESS');
+    } catch (e) {
+      return res.status(400).json({ error: "Order is not awaiting requirements" });
     }
 
     const updated = await prisma.order.update({
@@ -54,7 +57,9 @@ const markOrderAsShipped = async (req, res) => {
 
     if (!order) return res.status(404).json({ error: "Order not found or unauthorized" });
 
-    if (order.status !== 'IN_PROGRESS') {
+    try {
+      assertTransition(order.status, 'SHIPPED');
+    } catch (e) {
       return res.status(400).json({ error: `Only IN_PROGRESS orders can be shipped (current: ${order.status})` });
     }
 
@@ -85,7 +90,9 @@ const completeOrder = async (req, res) => {
     if (!order) return res.status(404).json({ error: "Order not found" });
     if (order.buyerId !== userId) return res.status(403).json({ error: "Unauthorized" });
 
-    if (order.status !== 'SHIPPED') {
+    try {
+      assertTransition(order.status, 'COMPLETED');
+    } catch (e) {
       return res.status(400).json({ error: `Only SHIPPED orders can be completed (current: ${order.status})` });
     }
 

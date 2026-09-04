@@ -1,6 +1,7 @@
-const crypto = require('crypto');
 const { prisma } = require('../../prisma');
 const { getRazorpay } = require('../lib/razorpay');
+const { assertValidPaise } = require('../lib/pricing');
+const { verifySignature } = require('../lib/paymentVerify');
 
 const createPaymentOrder = async (req, res) => {
   const { sourceId, type } = req.body;
@@ -69,12 +70,14 @@ const createPaymentOrder = async (req, res) => {
         return res.status(400).json({ error: "Invalid Order Type" });
     }
 
-    if (!Number.isInteger(priceToCharge) || priceToCharge <= 0) {
+    try {
+      assertValidPaise(priceToCharge);
+    } catch (e) {
       return res.status(400).json({ error: "Invalid price" });
     }
 
     const options = {
-      amount: Math.round(priceToCharge), // Already in paise (DB stores paise) — do NOT multiply again
+      amount: priceToCharge, // Already in paise (DB stores paise) — do NOT multiply again
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
       notes: { userId, sourceId, type }
@@ -112,13 +115,14 @@ const verifyPayment = async (req, res) => {
     dbOrderId
   } = req.body;
 
-  const body = razorpay_order_id + "|" + razorpay_payment_id;
-  const expectedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-    .update(body.toString())
-    .digest('hex');
+  const ok = verifySignature(
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
+    process.env.RAZORPAY_KEY_SECRET
+  );
 
-  if (expectedSignature !== razorpay_signature) {
+  if (!ok) {
     return res.status(400).json({ success: false, error: "Invalid Signature" });
   }
 
