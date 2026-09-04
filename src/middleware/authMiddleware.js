@@ -3,6 +3,16 @@ const { jwtDecrypt } = require('jose');
 const jwt = require('jsonwebtoken');
 const { getDerivedEncryptionKey } = require('../utils/authUtils');
 
+async function loadRole(userId) {
+  try {
+    const { prisma } = require('../../prisma');
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    return u?.role || 'CUSTOMER';
+  } catch {
+    return 'CUSTOMER';
+  }
+}
+
 const isAuthenticated = async (req, res, next) => {
   try {
     // 1. Try to get token from Authorization header
@@ -27,6 +37,7 @@ const isAuthenticated = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'jwt_secret');
       if (decoded.id) {
         req.user = decoded.id;
+        req.role = decoded.role || (await loadRole(decoded.id));
         return next();
       }
     } catch (jwtError) {
@@ -42,6 +53,7 @@ const isAuthenticated = async (req, res, next) => {
 
       if (payload.sub) {
         req.user = payload.sub;
+        req.role = await loadRole(payload.sub);
         return next();
       }
     } catch (jweError) {

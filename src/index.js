@@ -9,6 +9,7 @@ const designerRoutes = require('./routes/designerRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const inboxRoutes = require('./routes/inboxRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const { initSocket } = require('./lib/socket');
 const { createServer } = require('http');
 const swaggerUi = require('swagger-ui-express');
@@ -38,6 +39,7 @@ app.use('/designers', designerRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/inbox', inboxRoutes);
 app.use('/orders', orderRoutes);
+app.use('/admin', adminRoutes);
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 

@@ -8,6 +8,7 @@ const {
     submitMeasurements
 } = require('../controllers/orderController');
 const { isAuthenticated } = require('../middleware/authMiddleware');
+const { requireRole } = require('../middleware/requireRole');
 
 const router = Router();
 router.use(isAuthenticated);
@@ -32,7 +33,7 @@ router.use(isAuthenticated);
  *       200:
  *         description: Created order
  */
-router.post('/accept-offer', createOrderFromOffer);
+router.post('/accept-offer', requireRole('CUSTOMER', 'ADMIN'), createOrderFromOffer);
 
 // The Main "Slow Fashion" Workflow
 /**
@@ -63,7 +64,7 @@ router.post('/accept-offer', createOrderFromOffer);
  *       200:
  *         description: Updated order
  */
-router.post('/submit-measurements', submitMeasurements); // Step 2: User adds size
+router.post('/submit-measurements', requireRole('CUSTOMER', 'ADMIN'), submitMeasurements); // Step 2: User adds size
 /**
  * @openapi
  * /orders/ship:
@@ -85,7 +86,7 @@ router.post('/submit-measurements', submitMeasurements); // Step 2: User adds si
  *       200:
  *         description: Updated order
  */
-router.post('/ship', markOrderAsShipped);               // Step 3: Designer ships
+router.post('/ship', requireRole('DESIGNER', 'ADMIN'), markOrderAsShipped);               // Step 3: Designer ships
 /**
  * @openapi
  * /orders/complete:
@@ -105,7 +106,7 @@ router.post('/ship', markOrderAsShipped);               // Step 3: Designer ship
  *       200:
  *         description: Updated order
  */
-router.post('/complete', completeOrder);                // Step 4: User accepts
+router.post('/complete', requireRole('CUSTOMER', 'ADMIN'), completeOrder);                // Step 4: User accepts
 
 // Dashboards
 /**

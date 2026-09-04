@@ -27,6 +27,7 @@ test('GET /openapi.json exposes all routers', async () => {
   for (const p of [
     '/auth/login', '/designs', '/designers', '/profile/settings',
     '/payments/create-order', '/inbox/list', '/orders/ship', '/health',
+    '/admin/users', '/admin/orders', '/admin/designs',
   ]) {
     assert.ok(spec.paths[p], `missing OpenAPI path ${p}`);
   }

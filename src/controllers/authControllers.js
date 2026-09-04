@@ -130,13 +130,14 @@ const changeRole = async (req, res) => {
     const { role } = req.body;
     console.log("👉 2. Requested Role Change:", role);
 
-    // 3. Validate Role Conversion
+    // 3. Validate Role Conversion (self-service: customer <-> designer only;
+    // ADMIN grants go through POST /admin/users/:id/role)
     let newRole;
     if (role === 'designer') newRole = 'DESIGNER';
     else if (role === 'customer') newRole = 'CUSTOMER';
     else {
       console.log("❌ Invalid Role String:", role);
-      return res.status(400).json({ error: "Invalid role specified" });
+      return res.status(400).json({ error: "Invalid role specified (use designer/customer)" });
     }
 
     console.log("👉 3. Converted to Enum:", newRole);

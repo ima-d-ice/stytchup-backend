@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { addDesign, getDesigns, getDesignById } = require('../controllers/designControllers');
 const { isAuthenticated } = require('../middleware/authMiddleware');
+const { requireRole } = require('../middleware/requireRole');
 
 const router = Router();
 
@@ -69,6 +70,6 @@ router.get('/:id', getDesignById); // matches /designs/:id
  *       200:
  *         description: Created design
  */
-router.post('/add', isAuthenticated, addDesign); // matches /designs/add
+router.post('/add', isAuthenticated, requireRole('DESIGNER', 'ADMIN'), addDesign); // matches /designs/add
 
 module.exports = router;

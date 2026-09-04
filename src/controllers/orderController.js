@@ -1,5 +1,6 @@
 const { prisma } = require('../../prisma');
 const { assertTransition } = require('../lib/orderTransitions');
+const { emitOrderUpdated } = require('../lib/socket');
 
 // 1. Submit Measurements (User Action)
 // Triggers transition: AWAITING_REQUIREMENTS -> IN_PROGRESS
@@ -11,7 +12,7 @@ const submitMeasurements = async (req, res) => {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
-    if (order.buyerId !== req.user) return res.status(403).json({ error: "Not authorized" });
+    if (req.role !== 'ADMIN' && order.buyerId !== req.user) return res.status(403).json({ error: "Not authorized" });
 
     // Only allow if in correct state (AWAITING_REQUIREMENTS -> IN_PROGRESS)
     try {
@@ -27,6 +28,7 @@ const submitMeasurements = async (req, res) => {
         status: 'IN_PROGRESS' // <--- WORK BEGINS! Designer sees this now.
       }
     });
+    emitOrderUpdated(orderId, 'IN_PROGRESS');
 
     res.json(updated);
   } catch (err) {
@@ -47,9 +49,11 @@ const markOrderAsShipped = async (req, res) => {
 
   try {
     // Verify ownership using the new 'designerId' field directly
-    // This works for BOTH Catalog items AND Custom Orders
+    // This works for BOTH Catalog items AND Custom Orders (ADMIN bypasses)
     const order = await prisma.order.findFirst({
-        where: {
+        where: req.role === 'ADMIN'
+          ? { id: orderId }
+          : {
           id: orderId,
           designerId: designerId // <--- DIRECT CHECK
         }
@@ -71,6 +75,7 @@ const markOrderAsShipped = async (req, res) => {
         shippingCarrier: carrier,
       }
     });
+    emitOrderUpdated(orderId, 'SHIPPED', { trackingNumber, carrier });
     res.json(updated);
   } catch (err) {
     console.error("Shipping Error:", err);
@@ -88,7 +93,7 @@ const completeOrder = async (req, res) => {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
 
     if (!order) return res.status(404).json({ error: "Order not found" });
-    if (order.buyerId !== userId) return res.status(403).json({ error: "Unauthorized" });
+    if (req.role !== 'ADMIN' && order.buyerId !== userId) return res.status(403).json({ error: "Unauthorized" });
 
     try {
       assertTransition(order.status, 'COMPLETED');
@@ -104,6 +109,7 @@ const completeOrder = async (req, res) => {
         deliveredAt: new Date() // Buyer confirms they have the physical item
       }
     });
+    emitOrderUpdated(orderId, 'COMPLETED');
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: "Completion failed" });
@@ -183,6 +189,11 @@ const createOrderFromOffer = async (req, res) => {
                 }
             }
         });
+        try {
+          const { getIO } = require('../lib/socket');
+          getIO().to(offerMsg.conversationId).emit('offer_accepted', { messageId, orderId: order.id });
+        } catch { /* socket not initialized */ }
+        emitOrderUpdated(order.id, 'AWAITING_REQUIREMENTS');
         res.json(order);
     } catch(e) {
         console.error("Offer Accept Error:", e);

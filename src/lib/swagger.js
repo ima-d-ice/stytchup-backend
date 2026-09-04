@@ -84,7 +84,7 @@ const options = {
     tags: [
       { name: 'Auth' }, { name: 'Designs' }, { name: 'Designers' },
       { name: 'Profile' }, { name: 'Payments' }, { name: 'Inbox' },
-      { name: 'Orders' }, { name: 'System' },
+      { name: 'Orders' }, { name: 'Admin' }, { name: 'System' },
     ],
   },
   apis: ['./src/routes/*.js', './src/controllers/*.js', './src/index.js', './src/lib/swagger.js'],

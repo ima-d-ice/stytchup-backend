@@ -2,6 +2,7 @@ const { prisma } = require('../../prisma');
 const { getRazorpay } = require('../lib/razorpay');
 const { assertValidPaise } = require('../lib/pricing');
 const { verifySignature } = require('../lib/paymentVerify');
+const { emitOrderUpdated } = require('../lib/socket');
 
 const createPaymentOrder = async (req, res) => {
   const { sourceId, type } = req.body;
@@ -93,12 +94,17 @@ const createPaymentOrder = async (req, res) => {
     });
 
     if (type === 'CHAT_OFFER') {
-       await prisma.message.update({
+       const updatedMsg = await prisma.message.update({
          where: { id: sourceId },
          data: { offerStatus: 'ACCEPTED' }
        });
+       try {
+         const { getIO } = require('../lib/socket');
+         getIO().to(updatedMsg.conversationId).emit('offer_accepted', { messageId: sourceId, orderId: newOrder.id });
+       } catch { /* socket not initialized */ }
     }
 
+    emitOrderUpdated(newOrder.id, 'PENDING');
     res.json({ ...rpOrder, dbOrderId: newOrder.id });
 
   } catch (error) {
@@ -135,6 +141,7 @@ const verifyPayment = async (req, res) => {
             razorpaySignature: razorpay_signature
         }
     });
+    emitOrderUpdated(dbOrderId, 'AWAITING_REQUIREMENTS');
 
     res.json({ success: true });
   } catch (err) {

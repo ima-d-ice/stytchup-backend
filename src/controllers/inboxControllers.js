@@ -78,10 +78,13 @@ const sendMessage = async (req, res) => {
       include: { sender: { select: { name: true, id: true } } }
     });
 
-    // Real-time Emit
+    // Real-time Emit (chat + negotiation engine)
     try {
         const io = getIO();
         io.to(conversationId).emit("new_message", newMessage);
+        if (newMessage.isOffer) {
+          io.to(conversationId).emit("offer_created", newMessage);
+        }
     } catch(e) { console.log("Socket emit skipped"); }
 
     // Bump conversation so inbox list ordering (updatedAt desc) stays fresh
