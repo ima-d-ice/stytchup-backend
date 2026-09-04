@@ -56,6 +56,10 @@ export const markOrderAsShipped = async (req: AuthRequest, res: Response) => {
 
     if (!order) return res.status(404).json({ error: "Order not found or unauthorized" });
 
+    if (order.status !== 'IN_PROGRESS') {
+      return res.status(400).json({ error: `Only IN_PROGRESS orders can be shipped (current: ${order.status})` });
+    }
+
     const updated = await prisma.order.update({
       where: { id: orderId },
       data: {
@@ -82,6 +86,10 @@ export const completeOrder = async (req: AuthRequest, res: Response) => {
     
     if (!order) return res.status(404).json({ error: "Order not found" });
     if (order.buyerId !== userId) return res.status(403).json({ error: "Unauthorized" });
+
+    if (order.status !== 'SHIPPED') {
+      return res.status(400).json({ error: `Only SHIPPED orders can be completed (current: ${order.status})` });
+    }
 
     const updated = await prisma.order.update({
       where: { id: orderId },

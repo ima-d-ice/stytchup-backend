@@ -17,6 +17,7 @@ export const initSocket = (httpServer: HttpServer) => {
 
     // Join a chat room
     socket.on('join_chat', (conversationId: string) => {
+      if (typeof conversationId !== 'string' || !conversationId.trim()) return;
       socket.join(conversationId);
     });
   });

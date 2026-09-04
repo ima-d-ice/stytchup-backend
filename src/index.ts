@@ -25,13 +25,12 @@ app.use(cors({
   origin: ['http://localhost:3000', 'https://stytchup.vercel.app'],
   credentials: true 
 }));
-app.use(express.json());
+// Single JSON parser with raised limit for base64 image uploads
+app.use(express.json({ limit: '50mb' }));
 
 // --- ROUTING ---
 // Mount auth routes at /auth (e.g., /auth/login, /auth/change-role)
 app.use('/auth', authRoutes);
-// Increase limit to 10mb or 50mb to allow image uploads via JSON
-app.use(express.json({ limit: '50mb' }));
 // Mount design routes at /designs (e.g., /designs, /designs/:id)
 // Note: I moved /add/designs to /designs/add to keep it standard
 app.use('/designs', designRoutes); 

@@ -71,8 +71,12 @@ export const createPaymentOrder = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ error: "Invalid Order Type" });
     }
 
+    if (!Number.isInteger(priceToCharge) || priceToCharge <= 0) {
+      return res.status(400).json({ error: "Invalid price" });
+    }
+
     const options = {
-      amount: priceToCharge * 100, // Convert to paise
+      amount: Math.round(priceToCharge), // Already in paise (DB stores paise) — do NOT multiply again
       currency: "INR",
       receipt: `receipt_${Date.now()}`,
       notes: { userId, sourceId, type }

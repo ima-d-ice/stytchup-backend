@@ -8,6 +8,13 @@ export const getOrCreateConversation = async (req: AuthRequest, res: Response) =
   const { targetUserId } = req.body;
   const myId = req.user!;
 
+  if (!targetUserId) {
+    return res.status(400).json({ error: "targetUserId is required" });
+  }
+  if (targetUserId === myId) {
+    return res.status(400).json({ error: "Cannot chat with yourself" });
+  }
+
   try {
     // Sort IDs to prevent duplicates
     const [user1Id, user2Id] = [myId, targetUserId].sort();
@@ -40,7 +47,23 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
   const { conversationId, text, isOffer, offerPrice, offerTitle, relatedDesignId } = req.body;
   const senderId = req.user!;
 
+  if (!conversationId) {
+    return res.status(400).json({ error: "conversationId is required" });
+  }
+
   try {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+    if (conversation.user1Id !== senderId && conversation.user2Id !== senderId) {
+      return res.status(403).json({ error: "Not a participant" });
+    }
+    if (isOffer && (offerPrice === undefined || offerPrice === null)) {
+      return res.status(400).json({ error: "offerPrice is required for offers" });
+    }
     const newMessage = await prisma.message.create({
       data: {
         conversationId,
@@ -63,6 +86,12 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
         io.to(conversationId).emit("new_message", newMessage);
     } catch(e) { console.log("Socket emit skipped"); }
 
+    // Bump conversation so inbox list ordering (updatedAt desc) stays fresh
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: new Date() },
+    });
+
     res.json(newMessage);
   } catch (err) {
     res.status(500).json({ error: "Failed to send" });
@@ -72,6 +101,16 @@ export const sendMessage = async (req: AuthRequest, res: Response) => {
 // 3. Get Messages
 export const getMessages = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!;
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.conversationId },
+    });
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+    if (conversation.user1Id !== userId && conversation.user2Id !== userId) {
+      return res.status(403).json({ error: "Not a participant" });
+    }
     const messages = await prisma.message.findMany({
       where: { conversationId: req.params.conversationId },
       orderBy: { createdAt: 'asc' },

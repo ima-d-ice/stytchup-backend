@@ -7,7 +7,8 @@ router.use(isAuthenticated);
 
 router.post('/create', getOrCreateConversation);
 router.post('/message', sendMessage);
-router.get('/:conversationId/messages', getMessages);
+// NOTE: /list must come before /:conversationId or "list" is treated as an ID
 router.get('/list', getMyConversations);
+router.get('/:conversationId/messages', getMessages);
 
 export default router;
