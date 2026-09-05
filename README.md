@@ -2,7 +2,7 @@
 
 Express + Socket.io API for **StytchUp**, a vertical fashion marketplace connecting customers with independent designers for made-to-order and custom pieces.
 
-Pair frontend: [`stytchup`](../stytchup) (Next.js). The two repos run together via `compose.yaml` in this repo.
+Pair frontend: [`stytchup-web`](../stytchup-web) (React + Vite). The two repos run together via `compose.yaml` in this repo.
 
 ## Features
 
@@ -11,7 +11,7 @@ Pair frontend: [`stytchup`](../stytchup) (Next.js). The two repos run together v
 - **Realtime negotiation engine** — Socket.io rooms per conversation (`join_chat`) and per order (`join_order`), with participant verification. Events: `new_message`, `offer_created`, `offer_accepted`, `order_updated` (emitted on every lifecycle mutation).
 - **Razorpay payments** — server-derived paise amounts (client amounts are never trusted), HMAC-SHA256 signature verification (`src/lib/paymentVerify.js`).
 - **OpenAPI/Swagger docs** — Swagger UI at `GET /docs`, raw spec at `GET /openapi.json` (32 paths).
-- **Auth** — bcrypt passwords, backend JWTs (7d), plus NextAuth JWE compatibility so the Next.js frontend session works against this API.
+- **Auth** — bcrypt passwords, backend JWTs (7d, `Authorization: Bearer`, consumed by the React `AuthContext`).
 
 ## Prerequisites
 
@@ -23,17 +23,11 @@ Pair frontend: [`stytchup`](../stytchup) (Next.js). The two repos run together v
 
 ### Option A — Docker Compose (recommended)
 
-Needs the frontend checkout as a sibling directory (`../stytchup`).
+Needs the frontend checkout as a sibling directory (`../stytchup-web`).
 
 ```bash
 cp .env.example .env   # then fill in secrets
 docker compose up --build
-```
-
-Dev with hot-reload:
-
-```bash
-docker compose -f compose.yaml -f compose.override.yaml up --build
 ```
 
 Services: API + sockets on `http://localhost:4000`, frontend on `http://localhost:3000`, Postgres on `5432`. The backend entrypoint syncs the Prisma schema (`prisma db push`) on boot.

@@ -1,9 +1,8 @@
 # StytchUp full stack (production-like).
 # Expects the frontend checkout as a sibling directory:
 #   <parent>/stytchup-backend   <- this repo
-#   <parent>/stytchup           <- frontend repo
+#   <parent>/stytchup-web       <- React (Vite) frontend
 # Run from THIS directory:  docker compose up --build
-# Dev with hot-reload:      docker compose -f compose.yaml -f compose.override.yaml up --build
 name: stytchup
 
 services:
@@ -45,14 +44,15 @@ services:
 
   frontend:
     build:
-      context: ../stytchup
+      context: ../stytchup-web
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
-        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${NEXT_PUBLIC_RAZORPAY_KEY_ID:-${RAZORPAY_KEY_ID:-}}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID:-${RAZORPAY_KEY_ID:-}}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - backend
 
