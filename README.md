@@ -2,7 +2,7 @@
 
 Express + Socket.io API for **StytchUp**, a vertical fashion marketplace connecting customers with independent designers for made-to-order and custom pieces.
 
-Pair frontend: [`stytchup-web`](../stytchup-web) (React + Vite). The two repos run together via `compose.yaml` in this repo.
+Pair frontend: [`stytchup`](../stytchup) (React + Vite). The two repos run together via `compose.yaml` in this repo.
 
 ## Features
 
@@ -23,7 +23,7 @@ Pair frontend: [`stytchup-web`](../stytchup-web) (React + Vite). The two repos r
 
 ### Option A — Docker Compose (recommended)
 
-Needs the frontend checkout as a sibling directory (`../stytchup-web`).
+Needs the frontend checkout as a sibling directory (`../stytchup`).
 
 ```bash
 cp .env.example .env   # then fill in secrets

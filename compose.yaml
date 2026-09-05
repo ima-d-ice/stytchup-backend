@@ -1,7 +1,7 @@
 # StytchUp full stack (production-like).
 # Expects the frontend checkout as a sibling directory:
 #   <parent>/stytchup-backend   <- this repo
-#   <parent>/stytchup-web       <- React (Vite) frontend
+#   <parent>/stytchup           <- React (Vite) frontend
 # Run from THIS directory:  docker compose up --build
 name: stytchup
 
@@ -44,7 +44,7 @@ services:
 
   frontend:
     build:
-      context: ../stytchup-web
+      context: ../stytchup
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}

@@ -31,8 +31,8 @@ jobs:
           path: stytchup-backend
       - uses: actions/checkout@v4
         with:
-          repository: ima-d-ice/stytchup-web
-          path: stytchup-web
+          repository: ima-d-ice/stytchup
+          path: stytchup
       - name: Validate compose config
         working-directory: stytchup-backend
         env:
@@ -43,4 +43,4 @@ jobs:
         working-directory: stytchup-backend
         run: docker build -t stytchup-backend:ci .
       - name: Build frontend image
-        run: docker build -t stytchup-frontend:ci -f stytchup-web/Dockerfile stytchup-web
+        run: docker build -t stytchup-frontend:ci -f stytchup/Dockerfile stytchup
