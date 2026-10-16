@@ -16,17 +16,6 @@ I built the API for StytchUp, a marketplace for made-to-order and custom designe
 - 32 documented endpoints (`GET /docs`, `GET /openapi.json`) over 8 routers; 31 `node:test` suites with zero deps, all passing.
 - Dual-auth middleware accepts backend JWTs and NextAuth JWE sessions (`src/middleware/authMiddleware.js:16-69`), so the Next.js frontend works without a second user store.
 
-## Demo
-
-Record (terminal + Swagger UI, 60s):
-
-1. `curl POST /auth/register` → `POST /auth/login` (save the JWT).
-2. As designer: `POST /designs/add` → open `GET /docs` and show the 32-path spec.
-3. `POST /payments/create-order` with `{ sourceId, type }` only — point out there is no `amount` field.
-4. Two terminals: `POST /orders/ship` in one, `order_updated` arriving over the socket in the other.
-
-Screenshot fallback: Swagger UI `/docs` and a `curl` register → login → create-order session.
-
 ## Architecture
 
 Thin routes → thin controllers → Prisma → Postgres. Auth runs before everything; sockets emit after every mutation.
@@ -53,21 +42,6 @@ flowchart LR
 - **Chat/offers:** get-or-create 1:1 conversations, text or priced offers, participant-checked history.
 - **Orders:** accept offer, submit measurements → `IN_PROGRESS`, ship (tracking required, designer) → `SHIPPED`, confirm receipt → `COMPLETED`; buyer and designer queues.
 - **Docs/ops:** `GET /health`, `GET /docs`, `GET /openapi.json`; Docker `HEALTHCHECK` hits `/health`.
-
-## Benchmarks / Results
-
-No latency/throughput numbers claimed — I have not measured this API under load. What the repo produces:
-
-| Suite | Count | What it proves | Reproduce |
-|---|---|---|---|
-| `pricing` | 6 | paise conversion, rounding, reject garbage, INR format | `npm test` |
-| `paymentVerify` | 4 | known HMAC vector, rejects tampered/wrong-secret | `npm test` |
-| `orderTransitions` | 5 | happy-path chain, illegal jumps rejected, terminals | `npm test` |
-| `requireRole` + `rbacRealtime` | 10 | 403/401 paths, ADMIN gates, every mutation emits | `npm test` |
-| `inboxRoutes` + `socketEmit` + `health` | 6 | route order, safe no-op emit, live `/health` + spec | `npm test` |
-| Total | 31 | pass on Node 20, no DB needed, ~0.5s | `npm ci && npm test` |
-
-Methodology: `node --test tests/*.test.js`, run locally and on `ubuntu-latest` in CI (which adds an OpenAPI sanity check).
 
 ## Design decisions and trade-offs
 
