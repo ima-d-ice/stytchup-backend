@@ -1,133 +1,148 @@
-# StytchUp Backend
+# StytchUp API — Express + Socket.io Marketplace Backend
 
-Express + Socket.io API for **StytchUp**, a vertical fashion marketplace connecting customers with independent designers for made-to-order and custom pieces.
+I built the API for StytchUp, a marketplace for made-to-order and custom designer fashion. It handles auth with RBAC, a state-driven order lifecycle, Razorpay payments, realtime chat negotiation over Socket.io, and serves Swagger docs — all in plain Node.js with zero test dependencies.
 
-Pair frontend: [`stytchup`](../stytchup) (React + Vite). The two repos run together via `compose.yaml` in this repo.
+![Node 20](https://img.shields.io/badge/node-20-slim)
+![Express 5](https://img.shields.io/badge/express-5.1-black)
+![Prisma 7 + Postgres 16](https://img.shields.io/badge/prisma-7_+_postgres-16-blue)
+![CI](https://github.com/ima-d-ice/stytchup-backend/actions/workflows/ci.yml/badge.svg)
+![License MIT](https://img.shields.io/badge/license-MIT-green)
+
+## Key highlights
+
+- One shared transition map (`src/lib/orderTransitions.js:4-12`) enforces the full lifecycle `PENDING → AWAITING_REQUIREMENTS → IN_PROGRESS → SHIPPED → COMPLETED` (+ `CANCELLED`/`REFUNDED`) across orders, payments, and admin cancel.
+- Payments never trust the client: amounts are derived server-side in integer paise and signatures verified with HMAC-SHA256 `timingSafeEqual` (`src/controllers/paymentControllers.js:54,81`, `src/lib/paymentVerify.js:4-17`).
+- Realtime rooms are participant-verified (`join_chat`, `join_order`) with `new_message` / `offer_created` / `offer_accepted` / `order_updated` on every lifecycle mutation (`src/lib/socket.js:35,47,72-76`).
+- 32 documented endpoints (`GET /docs`, `GET /openapi.json`) over 8 routers; 31 `node:test` suites with zero deps, all passing.
+- Dual-auth middleware accepts backend JWTs and NextAuth JWE sessions (`src/middleware/authMiddleware.js:16-69`), so the Next.js frontend works without a second user store.
+
+## Demo
+
+Record (terminal + Swagger UI, 60s):
+
+1. `curl POST /auth/register` → `POST /auth/login` (save the JWT).
+2. As designer: `POST /designs/add` → open `GET /docs` and show the 32-path spec.
+3. `POST /payments/create-order` with `{ sourceId, type }` only — point out there is no `amount` field.
+4. Two terminals: `POST /orders/ship` in one, `order_updated` arriving over the socket in the other.
+
+Screenshot fallback: Swagger UI `/docs` and a `curl` register → login → create-order session.
+
+## Architecture
+
+Thin routes → thin controllers → Prisma → Postgres. Auth runs before everything; sockets emit after every mutation.
+
+```mermaid
+flowchart LR
+  Client[Next.js frontend / any client] --> CORS[CORS + cookieParser + json 50mb]
+  CORS --> Auth[isAuthenticated<br/>JWT Bearer / cookie / NextAuth JWE]
+  Auth --> RBAC[requireRole<br/>CUSTOMER / DESIGNER / ADMIN]
+  RBAC --> Routes[8 routers<br/>auth designs designers profile payments inbox orders admin]
+  Routes --> Ctrl[controllers<br/>ownership + assertTransition checks]
+  Ctrl --> PG[(Postgres 16 + Prisma 7<br/>8 models, 4 enums)]
+  Ctrl --> IO[Socket.io rooms<br/>chat id order id]
+  Ctrl --> RP[Razorpay lazy singleton<br/>server-derived paise]
+  Routes --> Docs[Swagger UI /docs<br/>openapi.json]
+```
 
 ## Features
 
-- **Role-based access control** — `CUSTOMER`, `DESIGNER`, `ADMIN` roles; `requireRole()` middleware guards designer-only routes (`POST /designs/add`, `POST /orders/ship`) and all `/admin/*` ops routes (user/role management, order cancel/refund, design activate/deactivate).
-- **State-driven order lifecycle** — `PENDING → AWAITING_REQUIREMENTS → IN_PROGRESS → SHIPPED → COMPLETED` (plus `CANCELLED`/`REFUNDED`), enforced by a single shared transition map (`src/lib/orderTransitions.js`).
-- **Realtime negotiation engine** — Socket.io rooms per conversation (`join_chat`) and per order (`join_order`), with participant verification. Events: `new_message`, `offer_created`, `offer_accepted`, `order_updated` (emitted on every lifecycle mutation).
-- **Razorpay payments** — server-derived paise amounts (client amounts are never trusted), HMAC-SHA256 signature verification (`src/lib/paymentVerify.js`).
-- **OpenAPI/Swagger docs** — Swagger UI at `GET /docs`, raw spec at `GET /openapi.json` (32 paths).
-- **Auth** — bcrypt passwords, backend JWTs (7d, `Authorization: Bearer`, consumed by the React `AuthContext`).
+- **Auth:** register (always `CUSTOMER`), login (JWT 7d + httpOnly cookie), Google find-or-create sync, self-service customer ↔ designer switch (never `ADMIN`).
+- **RBAC:** `requireRole()` guards designer writes and all 7 `/admin/*` ops endpoints (user roles, order cancel/refund, design visibility).
+- **Catalog:** public `GET /designs`, designer `POST /designs/add` (paise); designer list + portfolio.
+- **Payments:** `POST /payments/create-order` (`CATALOG`/`CHAT_OFFER`) → Razorpay order + `PENDING`; `POST /payments/verify` (HMAC) → `AWAITING_REQUIREMENTS`.
+- **Chat/offers:** get-or-create 1:1 conversations, text or priced offers, participant-checked history.
+- **Orders:** accept offer, submit measurements → `IN_PROGRESS`, ship (tracking required, designer) → `SHIPPED`, confirm receipt → `COMPLETED`; buyer and designer queues.
+- **Docs/ops:** `GET /health`, `GET /docs`, `GET /openapi.json`; Docker `HEALTHCHECK` hits `/health`.
 
-## Prerequisites
+## Benchmarks / Results
 
-- Node.js 20+ (type-stripping not needed — plain CommonJS)
-- PostgreSQL 16 (or use Docker Compose below)
-- A `.env` file (see `.env.example`)
+No latency/throughput numbers claimed — I have not measured this API under load. What the repo produces:
 
-## Quickstart
+| Suite | Count | What it proves | Reproduce |
+|---|---|---|---|
+| `pricing` | 6 | paise conversion, rounding, reject garbage, INR format | `npm test` |
+| `paymentVerify` | 4 | known HMAC vector, rejects tampered/wrong-secret | `npm test` |
+| `orderTransitions` | 5 | happy-path chain, illegal jumps rejected, terminals | `npm test` |
+| `requireRole` + `rbacRealtime` | 10 | 403/401 paths, ADMIN gates, every mutation emits | `npm test` |
+| `inboxRoutes` + `socketEmit` + `health` | 6 | route order, safe no-op emit, live `/health` + spec | `npm test` |
+| Total | 31 | pass on Node 20, no DB needed, ~0.5s | `npm ci && npm test` |
 
-### Option A — Docker Compose (recommended)
+Methodology: `node --test tests/*.test.js`, run locally and on `ubuntu-latest` in CI (which adds an OpenAPI sanity check).
 
-Needs the frontend checkout as a sibling directory (`../stytchup`).
+## Design decisions and trade-offs
+
+1. **Single transition map over scattered checks:** one `TRANSITIONS` object + `assertTransition` is imported by orders, payments, and admin — illegal states are unrepresentable, at the cost of all lifecycle knowledge living in one file.
+2. **Integer paise over floats:** money is `Math.round(rupees * 100)` everywhere (`src/lib/pricing.js`); no `0.1 + 0.2` class of bugs, at the cost of converting at every boundary.
+3. **Server-derived amounts over client amounts:** `create-order` takes only `{ sourceId, type }` and prices from the DB (contract-tested on both sides). Costs one extra lookup per checkout.
+4. **Lazy Razorpay singleton over fail-fast init:** `getRazorpay()` returns null without keys so the API boots and serves everything except payments — better for dev/CI, worse for surfacing misconfig (payment calls fail late).
+5. **JWT + NextAuth-JWE compat over pure JWT:** the middleware verifies backend tokens first, then decrypts NextAuth sessions with an HKDF-derived key, so the Next.js frontend needs no user store of its own. Cost: two auth code paths to maintain.
+
+## Quick start
 
 ```bash
-cp .env.example .env   # then fill in secrets
-docker compose up --build
-```
-
-Services: API + sockets on `http://localhost:4000`, frontend on `http://localhost:3000`, Postgres on `5432`. The backend entrypoint syncs the Prisma schema (`prisma db push`) on boot.
-
-### Option B — Local
-
-```bash
-npm install
-cp .env.example .env   # set DATABASE_URL, JWT_SECRET, NEXTAUTH_SECRET
+npm ci
+cp .env.example .env   # then fill in secrets (table below)
 npx prisma generate
 npx prisma db push
-npm run dev            # node --watch src/index.js
+npm run dev            # node --watch src/index.js → http://localhost:4000
 ```
-
-## Environment
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres connection string |
 | `JWT_SECRET` | yes | Signs backend JWTs |
-| `NEXTAUTH_SECRET` | yes | Must match the frontend value (JWE compat) |
-| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | for payments | Razorpay order creation + verification |
+| `NEXTAUTH_SECRET` | yes | Must match frontend (JWE compat) |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | for payments | Order creation + HMAC verify |
 | `PORT` | no (default `4000`) | API port |
-| `NODE_ENV` | no | `production` enables secure cookies |
 
-## Scripts
+Docker Compose (needs `../stytchup` sibling checkout, API + sockets `:4000`, web `:3000`, Postgres `:5432`):
 
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Watch-mode dev server |
-| `npm start` | Production server (`src/index.js`) |
-| `npm test` | `node:test` suites (31 tests, zero deps) |
-| `npm run build` | `prisma generate` (no compile step — plain JS) |
+```bash
+cp .env.example .env   # set JWT_SECRET, NEXTAUTH_SECRET at minimum
+docker compose up --build
+```
 
-## API reference
+> Note: `compose.yaml` still passes `VITE_*` build args but the frontend `main` branch is Next.js again (needs `NEXT_PUBLIC_*`). Override with `--build-arg` or update compose.
 
-Interactive docs: `http://localhost:4000/docs`. Raw spec: `/openapi.json`. Health: `GET /health`.
-
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| POST | `/auth/register` | — | Register (always `CUSTOMER`) |
-| POST | `/auth/login` | — | Login, returns JWT + httpOnly cookie |
-| POST | `/auth/google-sync` | — | Find-or-create Google user for NextAuth |
-| POST | `/auth/change-role` | user | Self-service `designer` ↔ `customer` |
-| GET | `/designs`, `GET /designs/:id` | — | Public catalog |
-| POST | `/designs/add` | designer | Publish a design (price in paise) |
-| GET | `/designers`, `GET /designers/:id` | — | Designer list + portfolio |
-| GET | `/profile/settings` | user | Own profile (no password) |
-| PUT | `/profile/update` | user | Upsert profile |
-| POST | `/profile/address` | user | Add address |
-| POST | `/payments/create-order` | user | Razorpay order (`CATALOG`/`CHAT_OFFER`) |
-| POST | `/payments/verify` | user | Verify signature → `AWAITING_REQUIREMENTS` |
-| POST | `/inbox/create` | user | Get-or-create 1:1 conversation |
-| POST | `/inbox/message` | user | Text or custom offer (paise) |
-| GET | `/inbox/list` | user | Conversations + last message |
-| GET | `/inbox/:id/messages` | participant | History |
-| POST | `/orders/submit-measurements` | buyer | → `IN_PROGRESS` |
-| POST | `/orders/ship` | designer | → `SHIPPED` (tracking required) |
-| POST | `/orders/complete` | buyer | → `COMPLETED` |
-| GET | `/orders/my-orders` | buyer | Purchase history |
-| GET | `/orders/designer-orders` | designer | Fulfillment queue |
-| GET | `/admin/users|orders|designs` | admin | Ops listings |
-| POST | `/admin/users/:id/role` | admin | Grant `CUSTOMER`/`DESIGNER`/`ADMIN` |
-| POST | `/admin/orders/:id/cancel` | admin | State-checked cancel |
-| POST | `/admin/orders/:id/refund` | admin | Mark refunded |
-| PATCH | `/admin/designs/:id/active` | admin | Show/hide design |
-
-Money is integer **paise** everywhere (`₹1 = 100`); see `src/lib/pricing.js`.
-
-### Socket events
-
-Connect with `io(url, { auth: { token: 'Bearer <jwt>' } })`.
-
-| Direction | Event | Payload |
-|---|---|---|
-| client → server | `join_chat` | `conversationId` (participant-verified) |
-| client → server | `join_order` | `orderId` (buyer/designer/admin-verified) |
-| server → room | `new_message` | message |
-| server → room | `offer_created` | offer message |
-| server → room | `offer_accepted` | `{ messageId, orderId }` |
-| server → `order:<id>` | `order_updated` | `{ orderId, status, ... }` |
+```bash
+npm test    # 31 tests, verified passing (~0.5s, no DB)
+npm start   # production: node src/index.js
+```
 
 ## Project structure
 
 ```
-prisma/              # schema.prisma (8 models, RBAC roles, order lifecycle enums)
-src/
-  index.js           # express app + socket bootstrap + /docs mount
-  routes/            # auth, designs, designers, profile, payments, inbox, orders, admin
-  controllers/       # request handlers (thin, ownership + transition checks)
-  middleware/        # isAuthenticated (JWT/JWE), requireRole
-  lib/               # socket, razorpay (lazy), pricing, paymentVerify,
-                     # orderTransitions, swagger
-  utils/             # signToken, NextAuth key derivation
-tests/               # node:test suites (lifecycle, RBAC, HMAC, routes, API smoke)
-compose.yaml         # postgres + backend + frontend stack
-Dockerfile           # multi-stage, non-root, HEALTHCHECK
-.github/workflows/  # ci.yml — test → OpenAPI check → docker builds
+prisma/schema.prisma  # 8 models (User, Profile, Address, Design, Order, Review, Conversation, Message) + Role/OrderStatus enums
+src/index.js          # express app + socket bootstrap + /health + /docs mount
+src/routes/           # 8 thin routers with @openapi annotations + middleware chain
+src/controllers/      # handlers: ownership + assertTransition + prisma + emit
+src/middleware/       # isAuthenticated (JWT/JWE), requireRole
+src/lib/              # socket, razorpay (lazy), pricing, paymentVerify, orderTransitions, swagger
+src/utils/            # signToken, NextAuth key derivation
+tests/                # 31 node:test suites, zero deps
+compose.yaml          # postgres + backend + frontend stack
+Dockerfile            # 3-stage, non-root appuser, HEALTHCHECK /health
+.github/workflows/   # ci.yml: test → OpenAPI check → docker builds
 ```
 
-## CI
+## Testing
 
-`.github/workflows/ci.yml` runs on push/PR to `main`: `npm ci` → `prisma generate` → `npm test` → OpenAPI sanity check → backend + frontend `docker build` → `compose config` validation (frontend repo checked out as sibling).
+```bash
+npm test       # node --test tests/*.test.js (same command CI uses)
+```
+
+Covers: paise math, HMAC vectors, the full lifecycle chain + illegal jumps, RBAC allow/403/401, static source audits (admin endpoints mounted, designer guards, `emitOrderUpdated` on every mutation), inbox route order, and a live boot test (`/health`, `/openapi.json` contains 11 key paths, `/docs` serves Swagger UI). No DB or Redis needed.
+
+## Limitations and future work
+
+- `prisma/migrations/` is declared but only `schema.prisma` exists — schema syncs via `db push`, no migration history.
+- `Review` model has no endpoints yet (schema-only).
+- Pruned backend leftovers with zero imports in `src/`: `bullmq`, `ioredis`, `stripe`, `next`, `next-auth`, `crypto` shim (`require('crypto')` resolves to the Node builtin).
+- Admin listings use `take: 100` with no pagination; no rate limiting; `express.json` limit is 50mb for base64 images.
+- Load numbers (p99, throughput) not measured yet — the next step is k6/autocannon against staging.
+
+## Tech stack
+
+Node 20, Express 5.1, Socket.io 4.8, Prisma 7 + Postgres 16, Razorpay 2.9, bcrypt + jsonwebtoken + jose, Swagger UI. Tests: built-in `node:test` only. Docker multi-stage, GitHub Actions.
+
+Contact: built by **imad-ice** — [github.com/ima-d-ice](https://github.com/ima-d-ice) — imads8444@gmail.com. Frontend: [ima-d-ice/stytchup](https://github.com/ima-d-ice/stytchup).
