@@ -99,14 +99,6 @@ Dockerfile            # 3-stage, non-root appuser, HEALTHCHECK /health
 .github/workflows/   # ci.yml: test → OpenAPI check → docker builds
 ```
 
-## Testing
-
-```bash
-npm test       # node --test tests/*.test.js (same command CI uses)
-```
-
-Covers: paise math, HMAC vectors, the full lifecycle chain + illegal jumps, RBAC allow/403/401, static source audits (admin endpoints mounted, designer guards, `emitOrderUpdated` on every mutation), inbox route order, and a live boot test (`/health`, `/openapi.json` contains 11 key paths, `/docs` serves Swagger UI). No DB or Redis needed.
-
 ## Limitations and future work
 
 - `prisma/migrations/` is declared but only `schema.prisma` exists — schema syncs via `db push`, no migration history.
